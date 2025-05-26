@@ -1,0 +1,9 @@
+[project]
+name = "spotifyimporter"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "spotdl>=4.2.11",
+    "spotipy>=2.25.1",
+]
