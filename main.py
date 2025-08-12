@@ -1,4 +1,5 @@
 import logging
+import os.path
 import tomllib
 from Navidrome import Navidrome
 from PlaylistDownloader import PlaylistDownloader
@@ -46,7 +47,7 @@ def sync_all_playlists():
         downloader.sync_this_playlist(playlist)
 
 if __name__ == "__main__":
-    with open('config.toml', 'rb') as f:
+    with open(os.path.join('Config', 'config.toml'), 'rb') as f:
         config = tomllib.load(f)
     logging.basicConfig(
         level=config["config"].get("log_level", "INFO"),

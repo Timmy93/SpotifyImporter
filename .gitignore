@@ -160,6 +160,7 @@ cython_debug/
 .idea/
 uv.lock
 config.toml
+Config/
 .cache
 *.mp3
 down/
