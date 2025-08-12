@@ -5,7 +5,7 @@ from Navidrome import Navidrome
 from PlaylistDownloader import PlaylistDownloader
 from Spotify import Spotify
 
-def download_playlist():
+def select_playlist():
     """
         Permette all'utente di selezionare una playlist Spotify, visualizzarne le tracce,
         identificare quelle mancanti in Navidrome e scaricarle nella cartella specificata.
@@ -54,9 +54,18 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         filename=config["config"].get("log_file", "SpotifyImporter.log")
     )
-    logging.info(f"Avvio di SpotifyImporter")
+    logging.info(f"Starting SpotifyImporter")
     spotify_client = Spotify(config)
     navidrome_client = Navidrome(config)
     downloader = PlaylistDownloader(config, spotify_client, navidrome_client)
+    if not config["download"].get("selected_playlist", []):
+        logging.info(f"Manuale playlist selection enabled.")
+        select_playlist()
+    else:
+        logging.info(f"Starting automatic playlist synchronization.")
+        downloader.sync()
+        logging.info(f"Stopped automatic playlist synchronization.")
+    logging.info(f"Finished SpotifyImporter")
+    print(f"Finished SpotifyImporter")
 
-    download_playlist()
+

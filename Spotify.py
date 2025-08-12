@@ -1,9 +1,8 @@
 import logging
 import os
-import shutil
-
 import spotdl
 import spotipy
+from spotdl.utils.config import DOWNLOADER_OPTIONS
 from spotipy import SpotifyOAuth
 
 
@@ -18,9 +17,13 @@ class Spotify:
             config['spotify']['redirect_uri']
         )
         self.logger.debug(f"Autenticato spotipy con client_id: {config['spotify']['client_id']}")
+        # Remove azlyrics that creates issues (infinite connections)
+        downloader_options = DOWNLOADER_OPTIONS
+        downloader_options['lyrics_providers']=["genius", "musixmatch"]
         self.downloader = spotdl.Spotdl(
             client_id=config['spotify']["client_id"],
-            client_secret=config['spotify']["client_secret"]
+            client_secret=config['spotify']["client_secret"],
+            downloader_settings=downloader_options
         )
         self.logger.debug(f"Autenticato spotdl con client_id: {config['spotify']['client_id']}")
 
@@ -127,25 +130,38 @@ class Spotify:
         os.makedirs(destination_path, exist_ok=True)
         songs_to_download = self.downloader.search([track['url'] for track in m_tracks])
         downloads = []
-        for song in songs_to_download:
-            print(f"Pronto per il download: {song.name} - {song.artist}")
-            try:
-                down, path = self.downloader.download(song)
-                if path:
-                    if self.config['download'].get("keep_cache", False):
-                        shutil.copy2(path, destination_path)
+        current_dir = os.getcwd()
+        try:
+            os.chdir(destination_path)
+            for song in songs_to_download:
+                print(f"Pronto per il download: {song.name} - {song.artist}")
+                s = Song(
+                    name=song.name,
+                    artist=song.artist,
+                    url=song.url,
+                    album=song.album,
+                    duration=song.duration,
+                    id=song.id
+                )
+                try:
+                    down, path = self.downloader.download(song)
+                    if path:
+                        # if self.config['download'].get("keep_cache", False):
+                        #     shutil.copy2(path, destination_path)
+                        # else:
+                        #     shutil.move(path, destination_path)
+                        downloads.append(down)
+                        print("✅ Download completato.")
+                        self.logger.info(f"Scaricata canzone - titolo: {song.name} - artista: {song.artist}")
                     else:
-                        shutil.move(path, destination_path)
-                    downloads.append(down)
-                    print("✅ Download completato.")
-                    self.logger.info(f"Scaricata canzone - titolo: {song.name} - artista: {song.artist}")
-                else:
-                    print(f"❌ Impossibile archiviare il file per {song.name} - {song.artist}. Download fallito.")
-                    self.logger.warning(f"Impossibile scaricare canzone - titolo: {song.name} - artista: {song.artist} (Forse V.M. 18?)")
-            except Exception as e:
-                print(f"❌ Errore durante il download: {e}")
-                self.logger.warning(
-                    f"Impossibile scaricare canzone - titolo: {song.name} - artista: {song.artist} [{e}]")
-        self.logger.info(f"Scaricate {len(downloads)} canzoni.")
-        return downloads
+                        print(f"❌ Impossibile archiviare il file per {song.name} - {song.artist}. Download fallito.")
+                        self.logger.warning(f"Impossibile scaricare canzone - titolo: {song.name} - artista: {song.artist} (Forse V.M. 18?)")
+                except Exception as e:
+                    print(f"❌ Errore durante il download: {e}")
+                    self.logger.warning(
+                        f"Impossibile scaricare canzone - titolo: {song.name} - artista: {song.artist} [{e}]")
+        finally:
+            os.chdir(current_dir)
+            self.logger.info(f"Scaricate {len(downloads)} canzoni.")
+            return downloads
 

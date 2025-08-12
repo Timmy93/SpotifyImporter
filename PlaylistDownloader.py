@@ -1,5 +1,5 @@
 import logging
-
+from time import sleep
 from Navidrome import Navidrome
 from Spotify import Spotify
 import re
@@ -13,6 +13,31 @@ class PlaylistDownloader:
         self.spotify_client = spotify_client
         self.navidrome_client = navidrome_client
 
+    def sync(self):
+        """
+        Avvia il processo di sincronizzazione delle playlist.
+        """
+        while True:
+            self.logger.info("Starting playlist download...")
+            self.sync_all_playlists()
+            self.logger.info("Playlist download completed. Pausing before next run...")
+            sleep(self.config["download"].get('pause', 15)*60)  # Pausa in minuti
+
+    def sync_all_playlists(self):
+        selected_playlists = self.config["download"].get("selected_playlist", [])
+        excluded_playlists = self.config["download"].get("excluded_playlists", [])
+        playlists = self.spotify_client.list_user_playlists()
+        for playlist in playlists:
+            if playlist['name'] in excluded_playlists:
+                self.logger.info(f"Skipping excluded playlist: {playlist['name']}")
+                continue
+            if playlist['name'] in selected_playlists:
+                self.logger.info(f"Syncing playlist: {playlist['name']}")
+                self.sync_this_playlist(playlist)
+            else:
+                self.logger.info(f"Skipping playlist: {playlist['name']} (not selected)")
+
+
     def extract_missing_songs(self, selected_playlist: dict) -> list:
         """
         Estrae le tracce mancanti da una playlist selezionata confrontando le tracce della playlist Spotify
@@ -25,8 +50,8 @@ class PlaylistDownloader:
         missing_tracks = []
         # Estrae le informazioni della playlist da Navidrome
         navidrome_playlist = self.select_navidrome_playlist(selected_playlist)
-        if not navidrome_playlist:
-            print("❌ Impossibile creare o trovare la playlist in Navidrome.")
+        if not navidrome_playlist or not navidrome_playlist.get('id'):
+            print(f"❌ Impossibile creare o trovare la playlist in Navidrome. {navidrome_playlist}")
             self.logger.error("Impossibile creare o trovare la playlist in Navidrome.")
             return []
         n_playlist_info = self.navidrome_client.get_playlist_info(navidrome_playlist['id'])
@@ -85,6 +110,7 @@ class PlaylistDownloader:
             Returns:
                 list: Lista di tracce (dict) che sono state scaricate.
             """
+            self.logger.info(f"Starting synchronization for playlist: {selected_playlist['name']}")
             dir_safe_name = pulisci_nome_cartella(selected_playlist['name'])
             missing_tracks = self.extract_missing_songs(selected_playlist)
             downloads = self.spotify_client.download_songs(missing_tracks, self.download_path, dir_safe_name)
@@ -92,6 +118,7 @@ class PlaylistDownloader:
                 print(f"📂 Scaricati {len(downloads)} brani su {len(missing_tracks)} richiesti.")
             else:
                 print("❌ Nessun brano scaricato. Tutti i brani erano già presenti in Navidrome.")
+            return downloads
 
     def select_navidrome_playlist(self, spotify_playlist: dict) -> dict:
         """
