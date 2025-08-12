@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
-    "spotdl>=4.2.11",
+    "requests==2.32.4",
+    "spotdl==4.3.1",
     "spotipy>=2.25.1",
 ]
