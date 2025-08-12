@@ -134,15 +134,7 @@ class Spotify:
         try:
             os.chdir(destination_path)
             for song in songs_to_download:
-                print(f"Pronto per il download: {song.name} - {song.artist}")
-                s = Song(
-                    name=song.name,
-                    artist=song.artist,
-                    url=song.url,
-                    album=song.album,
-                    duration=song.duration,
-                    id=song.id
-                )
+                self.logger.info(f"Requesting download of: {song.name} - {song.artist}")
                 try:
                     down, path = self.downloader.download(song)
                     if path:
@@ -152,7 +144,7 @@ class Spotify:
                         #     shutil.move(path, destination_path)
                         downloads.append(down)
                         print("✅ Download completato.")
-                        self.logger.info(f"Scaricata canzone - titolo: {song.name} - artista: {song.artist}")
+                        self.logger.info(f"Download completed: {song.name} - artista: {song.artist}")
                     else:
                         print(f"❌ Impossibile archiviare il file per {song.name} - {song.artist}. Download fallito.")
                         self.logger.warning(f"Impossibile scaricare canzone - titolo: {song.name} - artista: {song.artist} (Forse V.M. 18?)")
