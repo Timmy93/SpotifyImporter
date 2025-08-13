@@ -91,6 +91,25 @@ class Navidrome:
             self.logger.error(f"Errore nel recupero delle informazioni della playlist in Navidrome: {e}")
             return {}
 
+    def set_playlist_public(self, playlist_id: str, is_public: bool):
+        """
+        Imposta la visibilità di una playlist in Navidrome.
+        Args:
+            playlist_id (str): ID della playlist da modificare.
+            is_public (bool): True per rendere la playlist pubblica, False per privata.
+        """
+        params = {
+            "playlistId": playlist_id,
+            "public": "true" if is_public else "false"
+        }
+
+        response = self.send_request("rest/updatePlaylist", params)
+
+        if response.get("subsonic-response", {}).get("status") == "ok":
+            self.logger.info(f"Playlist {playlist_id} impostata come {'pubblica' if is_public else 'privata'}.")
+        else:
+            self.logger.error(f"Errore nell'impostare la playlist {playlist_id}: {response}")
+
     def send_request(self, endpoint: str, params: dict = None) -> dict:
         """Invia una richiesta a Navidrome e gestisce gli errori.
         Args:
@@ -120,6 +139,8 @@ class Navidrome:
         except Exception as e:
             self.logger.error(f"Errore durante la richiesta [{endpoint}] a Navidrome: {e}")
             raise
+
+
 
 def create_navidrome_token(password: str) -> tuple:
     """

@@ -5,7 +5,7 @@ from Navidrome import Navidrome
 from PlaylistDownloader import PlaylistDownloader
 from Spotify import Spotify
 
-def select_playlist():
+def select_playlist(spotify_client, downloader):
     """
         Permette all'utente di selezionare una playlist Spotify, visualizzarne le tracce,
         identificare quelle mancanti in Navidrome e scaricarle nella cartella specificata.
@@ -37,7 +37,7 @@ def select_playlist():
         else:
             print("Scelta non valida.")
 
-def sync_all_playlists():
+def sync_all_playlists(spotify_client, downloader):
     """
     Sincronizza tutte le playlist dell'utente Spotify con Navidrome, scaricando le tracce mancanti.
     """
@@ -46,7 +46,18 @@ def sync_all_playlists():
         print(f"\n🎵 Sincronizzazione della playlist: {playlist['name']}")
         downloader.sync_this_playlist(playlist)
 
-if __name__ == "__main__":
+def silence_debug_libraries():
+    """
+    Silenzia i log delle librerie di terze parti per evitare clutter nei log.
+    """
+    logging.getLogger("spotdl").setLevel(logging.WARNING)
+    logging.getLogger("spotipy").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
+def main ():
     with open(os.path.join('Config', 'config.toml'), 'rb') as f:
         config = tomllib.load(f)
     logging.basicConfig(
@@ -54,13 +65,14 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         filename=config["config"].get("log_file", "SpotifyImporter.log")
     )
+    silence_debug_libraries()
     logging.info(f"Starting SpotifyImporter")
     spotify_client = Spotify(config)
     navidrome_client = Navidrome(config)
     downloader = PlaylistDownloader(config, spotify_client, navidrome_client)
-    if not config["download"].get("selected_playlist", []):
+    if not config["download"].get("selected_playlists", []):
         logging.info(f"Manuale playlist selection enabled.")
-        select_playlist()
+        select_playlist(spotify_client, downloader)
     else:
         logging.info(f"Starting automatic playlist synchronization.")
         downloader.sync()
@@ -69,3 +81,5 @@ if __name__ == "__main__":
     print(f"Finished SpotifyImporter")
 
 
+if __name__ == "__main__":
+    main()

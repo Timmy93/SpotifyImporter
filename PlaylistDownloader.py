@@ -24,12 +24,15 @@ class PlaylistDownloader:
             sleep(self.config["download"].get('pause', 15)*60)  # Pausa in minuti
 
     def sync_all_playlists(self):
-        selected_playlists = self.config["download"].get("selected_playlist", [])
+        selected_playlists = self.config["download"].get("selected_playlists", [])
         excluded_playlists = self.config["download"].get("excluded_playlists", [])
         playlists = self.spotify_client.list_user_playlists()
+        if isinstance(selected_playlists, bool) and selected_playlists:
+            self.logger.info("Syncing all playlists.")
+            selected_playlists = [playlist['name'] for playlist in playlists]
         for playlist in playlists:
             if playlist['name'] in excluded_playlists:
-                self.logger.info(f"Skipping excluded playlist: {playlist['name']}")
+                self.logger.debug(f"Skipping excluded playlist: {playlist['name']}")
                 continue
             if playlist['name'] in selected_playlists:
                 self.logger.info(f"Syncing playlist: {playlist['name']}")
@@ -129,12 +132,25 @@ class PlaylistDownloader:
             dict: Le informazioni della playlist Navidrome creata o trovata.
         """
         navidrome_playlists = self.navidrome_client.list_playlists()
+        selected_navidrome_playlist = None
         for navidrome_playlist in navidrome_playlists:
             if navidrome_playlist['name'] == spotify_playlist['name']:
                 print(f"Playlist Navidrome trovata: {navidrome_playlist['name']} ({navidrome_playlist['id']})")
-                return navidrome_playlist
+                selected_navidrome_playlist = navidrome_playlist
+                break
+        if not selected_navidrome_playlist:
+            print(f"Playlist Navidrome non trovata, ne creo una nuova: {spotify_playlist['name']}")
+            self.logger.info(f"Creazione della nuova playlist Navidrome: {spotify_playlist['name']}")
+            selected_navidrome_playlist = self.navidrome_client.create_playlist(spotify_playlist['name'])
+            print(selected_navidrome_playlist)
 
-        return self.navidrome_client.create_playlist(spotify_playlist['name'])
+        # Verifica se la playlist è pubblica, se non lo è la rende pubblica
+        sp_info = self.navidrome_client.get_playlist_info(selected_navidrome_playlist['id'])
+        if not sp_info.get('public', False):
+            self.navidrome_client.set_playlist_public(selected_navidrome_playlist['id'], True)
+
+        return selected_navidrome_playlist
+
 
 
 
