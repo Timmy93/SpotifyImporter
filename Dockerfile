@@ -6,10 +6,9 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 
-RUN RUN apt-get -y update &&  \
-    && DEBIAN_FRONTEND=noninteractive \
-    apt-get install --no-install-recommends --assume-yes \
-    ffmpeg && \
+RUN RUN apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive && \
+    apt-get install --no-install-recommends -y ffmpeg && \
     pip3 install --user -r requirements.txt
 
 COPY . .
