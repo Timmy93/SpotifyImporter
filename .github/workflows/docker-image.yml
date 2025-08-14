@@ -33,11 +33,12 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Run Buildx (push image)
-        if: success()
-        run: |        
+        run: |
           docker buildx build \
-          --platform ${{ env.DOCKER_TARGET_PLATFORM }} \
-          --tag docker.io/${{ vars.DOCKER_HUB_USERNAME }}/${{ vars.DOCKER_HUB_REPOSITORY }}:$GITHUB_SHA \
-          --tag docker.io/${{ vars.DOCKER_HUB_USERNAME }}/${{ vars.DOCKER_HUB_REPOSITORY }}:latest \
-          --file ./Dockerfile \
-          --output type=image,push=true .
+            --platform ${{ env.DOCKER_TARGET_PLATFORM }} \
+            --tag docker.io/${{ vars.DOCKER_HUB_USERNAME }}/${{ vars.DOCKER_HUB_REPOSITORY }}:$GITHUB_SHA \
+            --tag docker.io/${{ vars.DOCKER_HUB_USERNAME }}/${{ vars.DOCKER_HUB_REPOSITORY }}:latest \
+            --file ./Dockerfile \
+            --cache-from=type=gha \
+            --cache-to=type=gha,mode=max \
+            --output type=image,push=true .
