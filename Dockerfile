@@ -7,7 +7,7 @@ WORKDIR /app
 COPY requirements.txt requirements.txt
 
 RUN pip3 install --user -r requirements.txt && \
-    spotdl --download-ffmpeg
+    /root/.local/bin/spotdl --download-ffmpeg
 
 COPY . .
 
