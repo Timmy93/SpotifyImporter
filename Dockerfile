@@ -6,10 +6,8 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 
-RUN apt-get -y update && \
-    DEBIAN_FRONTEND=noninteractive && \
-    apt-get install --no-install-recommends -y ffmpeg && \
-    pip3 install --user -r requirements.txt
+RUN pip3 install --user -r requirements.txt && \
+    spotdl --download-ffmpeg
 
 COPY . .
 
