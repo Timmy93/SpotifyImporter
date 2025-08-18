@@ -80,7 +80,7 @@ class PlaylistDownloader:
                     # Song to add to the playlist
                     track_to_add.append(selected_song['id'])
                 else:
-                    self.logger.info(f"Brano già presente nella playlist Navidrome: {item['search_string']}")
+                    self.logger.debug(f"Song already in Navidrome: {item['search_string']}")
             except Exception as e:
                 print(f"Errore nel parsing del brano '{item}': {e}")
                 self.logger.error(f"Errore nel parsing del brano '{item}': {e}", exc_info=True)
