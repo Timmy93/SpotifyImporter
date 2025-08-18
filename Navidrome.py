@@ -2,6 +2,8 @@ import hashlib
 import logging
 import random
 import string
+from dis import spec_op
+
 import requests
 
 class Navidrome:
@@ -14,15 +16,25 @@ class Navidrome:
             config['navidrome']["password"]
         )
 
-    def search_this_song(self, song_title: str, artist: str) -> list:
+    def search_this_song(self, song_info: dict) -> list:
+        """Cerca una canzone in Navidrome/OpenSubsonic utilizzando il titolo e l'artista.
+        Args:
+            song_info (dict): Un dizionario contenente le informazioni della canzone ('artist', 'name').
+        Returns:
+            list: Una lista di canzoni trovate che corrispondono alla ricerca.
+        """
         endpoint = "rest/search2.view"
+        artist = song_info['artist']
+        song_title = song_info['name']
+
+        sp_isrc = song_info['isrc']
         params = {
             "query": f"{artist} {song_title}",
-            "songCount": 1
         }
         try:
             data = self.send_request(endpoint, params)
-            return data.get("subsonic-response", {}).get("searchResult2", {}).get("song", [])
+            response = data.get("subsonic-response", {}).get("searchResult2", {}).get("song", [])
+            return response
         except (requests.HTTPError, Exception) as e:
             print(f"Errore nella richiesta a Navidrome: {e}")
             self.logger.error(f"Errore nella richiesta a Navidrome: {e}")
@@ -72,6 +84,35 @@ class Navidrome:
             self.logger.error(f"Errore nella creazione della playlist in Navidrome: {e}")
             return {}
 
+    def add_songs_to_playlist(self, playlist_id: str, songs_to_add: list, songs_to_remove: list) -> dict:
+        """Aggiunge canzoni a una playlist esistente in Navidrome/OpenSubsonic.
+
+        Args:
+            playlist_id (str): ID della playlist esistente.
+            songs_to_add (list): Lista di ID delle canzoni da aggiungere.
+
+        Returns:
+            dict: Risposta JSON della richiesta di aggiornamento della playlist.
+        """
+        endpoint = "rest/updatePlaylist.view"
+        params = {
+            "playlistId": playlist_id,
+            "songIdToAdd": songs_to_add,
+            "songIndexToRemove": songs_to_remove
+        }
+        if not songs_to_add and not songs_to_remove:
+            # Se non ci sono canzoni da aggiungere o rimuovere
+            self.logger.debug(f"Nessuna canzone da aggiungere/rimuovere dalla playlist con ID {playlist_id}.")
+            return {}
+
+        self.logger.info(f"Aggiungo {len(songs_to_add)} canzoni/Rimuovo {len(songs_to_remove)} alla playlist con ID {playlist_id}")
+
+        try:
+            return self.send_request(endpoint, params)
+        except (requests.HTTPError, Exception) as e:
+            self.logger.error(f"Errore nell'aggiunta delle canzoni alla playlist {playlist_id}: {e}")
+            return {}
+
     def get_playlist_info(self, playlist_id: str) -> dict:
         """Recupera le informazioni di una playlist specifica in Navidrome.
         Args:
@@ -109,6 +150,7 @@ class Navidrome:
             self.logger.info(f"Playlist {playlist_id} impostata come {'pubblica' if is_public else 'privata'}.")
         else:
             self.logger.error(f"Errore nell'impostare la playlist {playlist_id}: {response}")
+
 
     def send_request(self, endpoint: str, params: dict = None) -> dict:
         """Invia una richiesta a Navidrome e gestisce gli errori.

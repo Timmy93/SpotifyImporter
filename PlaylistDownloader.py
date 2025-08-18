@@ -26,6 +26,7 @@ class PlaylistDownloader:
     def sync_all_playlists(self):
         selected_playlists = self.config["download"].get("selected_playlists", [])
         excluded_playlists = self.config["download"].get("excluded_playlists", [])
+        liked_songs = self.config["download"].get("liked_songs", False)
         playlists = self.spotify_client.list_user_playlists()
         if isinstance(selected_playlists, bool) and selected_playlists:
             self.logger.info("Syncing all playlists.")
@@ -45,7 +46,7 @@ class PlaylistDownloader:
                 self.logger.info(f"Skipping playlist: {playlist['name']} (not selected)")
 
 
-    def extract_missing_songs(self, selected_playlist: dict) -> list:
+    def extract_missing_songs(self, selected_playlist: dict, remove_duplicates = True) -> list:
         """
         Estrae le tracce mancanti da una playlist selezionata confrontando le tracce della playlist Spotify
         con quelle presenti in Navidrome.
@@ -63,51 +64,45 @@ class PlaylistDownloader:
             return []
         n_playlist_info = self.navidrome_client.get_playlist_info(navidrome_playlist['id'])
         track_to_add = []
-        tracks = self.spotify_client.get_playlist_tracks(selected_playlist)
-        for number, item in enumerate(tracks, start=1):
+        track_to_remove = []
+        if remove_duplicates:
+            track_to_remove.extend(self.remove_duplicates_from_playlist(n_playlist_info))
+        spotify_track_list = self.spotify_client.get_playlist_tracks(selected_playlist)
+        for number, item in enumerate(spotify_track_list, start=1):
             try:
-                songs_found = self.navidrome_client.search_this_song(item['name'], item['artist'])
-                status = "✅" if songs_found else "❌"
-                print(f"{number}) {status} {item["search_string"]}")
-                if not songs_found:
+                songs_found = self.navidrome_client.search_this_song(item)
+                selected_song = self.select_song(songs_found, item)
+                if not selected_song:
+                    # Song to download
                     missing_tracks.append(item)
-                    self.logger.info(f"Brano mancante - Richiedo download {item['search_string']}")
+                    self.logger.info(f"Identificato brano mancante - {item['search_string']}")
+                elif not self.song_in_playlist(item, n_playlist_info, strict_search=False) and not self.song_in_playlist(item, n_playlist_info, strict_search=True):
+                    # Song to add to the playlist
+                    track_to_add.append(selected_song['id'])
                 else:
-                    track_to_add.append(songs_found[0]['id'])
+                    self.logger.info(f"Brano già presente nella playlist Navidrome: {item['search_string']}")
             except Exception as e:
                 print(f"Errore nel parsing del brano '{item}': {e}")
+                self.logger.error(f"Errore nel parsing del brano '{item}': {e}", exc_info=True)
+                exit(1)
 
-        self.navidrome_client.create_playlist(n_playlist_info['name'], n_playlist_info['id'], track_to_add)
-
+        self.navidrome_client.add_songs_to_playlist(n_playlist_info['id'], track_to_add, track_to_remove)
         return missing_tracks
 
-    @staticmethod
-    def song_in_playlist(navidrome_song: dict, navidrome_playlist: dict) -> bool:
+    def song_in_playlist(self, spotify_song: dict, navidrome_playlist: dict, strict_search: bool = True) -> bool:
         songs_in_playlist = navidrome_playlist.get('entry', [])
-        for playlist_song in songs_in_playlist:
-            if playlist_song['id'] == navidrome_song['id']:
-                print(f"Brano '{navidrome_song['title']}' di '{navidrome_song['artist']}' già presente nella playlist Navidrome.")
-                return True
-        print("Brano non presente nella playlist Navidrome.")
+        for navidrome_playlist_song in songs_in_playlist:
+            n_isrc = navidrome_playlist_song.get('isrc', [])
+            if strict_search:
+                if n_isrc and spotify_song['isrc'] == n_isrc[0]:
+                    self.logger.debug(f"Match by ISRC: {spotify_song['search_string']}")
+                    return True
+            else:
+                if navidrome_playlist_song['title'] == spotify_song['name'] and navidrome_playlist_song['artist'] == spotify_song['artist']:
+                    # Confronto basato su titolo e artista (meno affidabile)
+                    return True
+        self.logger.info(f"Brano assente dalla playlist Navidrome {spotify_song['name']} -> {navidrome_playlist['name']}")
         return False
-
-    def import_missing_songs(self, songs: list, navidrome_playlist: dict) -> bool:
-        """
-        Importa un brano mancante in Navidrome.
-        Args:
-            songs (list): Dizionario contenente le informazioni della traccia da importare.
-            navidrome_playlist (dict): Dizionario contenente le informazioni della playlist Navidrome.
-        Returns:
-            bool: True se il brano è stato importato con successo, False altrimenti.
-        """
-        try:
-            self.navidrome_client.create_playlist(navidrome_playlist["name"], navidrome_playlist['id'], songs)
-            print(f"Brano '{songs['title']}' aggiunto alla playlist '{navidrome_playlist["name"]}'.")
-            return True
-        except Exception as e:
-            print(f"Errore nell'importazione dei brani: {e}")
-            self.logger.error(f"Errore nell'importazione dei brani: {e}")
-            return False
 
     def sync_this_playlist(self, selected_playlist: dict) -> list:
             """
@@ -164,8 +159,54 @@ class PlaylistDownloader:
 
         return selected_navidrome_playlist
 
+    def select_song(self, n_songs_found: list, sp_song: dict) -> dict:
+        """Select the most appropriate song from the search results."""
+        if not n_songs_found:
+            return {}
+        elif len(n_songs_found) == 1:
+            if not self.compare_isrc(sp_song, n_songs_found[0]):
+                self.logger.info(f"No exact ISRC match found for {sp_song['search_string']}, returning first result.")
+            return n_songs_found[0]
+        else:
+            for n_song in n_songs_found:
+                if self.compare_isrc(sp_song, n_song):
+                    self.logger.debug(f"Match ISRC found: {n_song['isrc']} for {sp_song['search_string']}")
+                    return n_song
+            else:
+                # TODO fare la ricerca anche per titolo e artista
+                self.logger.warning(f"No ISRC match found for {sp_song['search_string']}. "
+                                    f"Returning first result: {n_songs_found[0]}")
+                return n_songs_found[0]
 
 
+    def compare_isrc(self, sp_song: dict, nv_song: dict) -> bool:
+        """
+        Confronta due ISRC e restituisce True se sono uguali, altrimenti False.
+        Args:
+            sp_isrc (str): ISRC della canzone in Spotify.
+            navidrome_isrc (list): lista di ISRC della canzone in Navidrome.
+        Returns:
+            bool: True se gli ISRC sono uguali, False altrimenti.
+        """
+        sp_isrc = sp_song['isrc']
+        nv_isrc_list = nv_song.get('isrc', [])
+        for n_isrc in nv_isrc_list:
+            if n_isrc == sp_isrc:
+                self.logger.debug(f"Match ISRC trovato: {n_isrc} for {sp_song['search_string']}")
+                return True
+        self.logger.debug(f"No ISRC match: Navidrome: {nv_isrc_list}, Spotify: {sp_isrc} for {sp_song['search_string']}")
+        return False
+
+    def remove_duplicates_from_playlist(self, playlist_info)-> list:
+        song_id = []
+        song_index_to_remove = []
+        for index, song in enumerate(playlist_info.get('entry', [])):
+            if song['id'] not in song_id:
+                song_id.append(song['id'])
+            else:
+                self.logger.info(f"Rimozione duplicato: {song['title']} di {song['artist']}")
+                song_index_to_remove.append(index)
+        return song_index_to_remove
 
 def pulisci_nome_cartella(dir_name):
     # Rimuove caratteri non autorizzati (mantiene lettere, numeri, spazi, trattini e underscore)

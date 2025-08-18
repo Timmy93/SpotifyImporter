@@ -101,6 +101,10 @@ class Spotify:
                     artist_name = ', '.join([artist['name'] for artist in track['artists']])
                     tracks.append({
                         'name': track_name,
+                        'isrc': track.get('external_ids', {}).get('isrc', ''),
+                        'duration': track['duration_ms'],
+                        'album': track['album']['name'],
+                        'album_release_date': track['album'].get('release_date', ''),
                         'url': track_url,
                         'artist': artist_name,
                         'id': track['id'],
