@@ -33,7 +33,7 @@ def select_playlist(spotify_client, downloader):
         elif 0 <= choice < len(playlists):
             selected = playlists[choice]
             print(f"\n🎵 Tracce nella playlist: {selected['name']}\n")
-            downloads = downloader.sync_this_playlist(selected)
+            downloader.sync_this_playlist(selected)
         else:
             print("Scelta non valida.")
 

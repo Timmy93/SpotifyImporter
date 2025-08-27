@@ -2,9 +2,11 @@ import hashlib
 import logging
 import random
 import string
-from dis import spec_op
-
 import requests
+
+class NavidromeException(Exception):
+    """Eccezione personalizzata per errori Navidrome."""
+    pass
 
 class Navidrome:
     def __init__(self, config):
@@ -26,8 +28,6 @@ class Navidrome:
         endpoint = "rest/search2.view"
         artist = song_info['artist']
         song_title = song_info['name']
-
-        sp_isrc = song_info['isrc']
         params = {
             "query": f"{artist} {song_title}",
         }
@@ -90,9 +90,11 @@ class Navidrome:
         Args:
             playlist_id (str): ID della playlist esistente.
             songs_to_add (list): Lista di ID delle canzoni da aggiungere.
+            songs_to_remove: Lista di ID delle canzoni da rimuovere dalla playlist.
 
         Returns:
             dict: Risposta JSON della richiesta di aggiornamento della playlist.
+
         """
         endpoint = "rest/updatePlaylist.view"
         params = {
