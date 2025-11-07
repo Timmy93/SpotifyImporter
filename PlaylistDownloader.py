@@ -81,10 +81,15 @@ class PlaylistDownloader:
 
     def compare_playlist_with_spotify(self, n_playlist_info, selected_playlist, playlist_status):
         spotify_track_list = self.spotify_client.get_playlist_tracks(selected_playlist)
+        # Track Navidrome song IDs that should be kept (matched with Spotify)
+        navidrome_songs_to_keep = set()
+        
         for number, spotify_song in enumerate(spotify_track_list, start=1):
-            if isrc_already_present(spotify_song, n_playlist_info):
-                # Skip exact matches
+            matched_navidrome_song = find_song_by_isrc(spotify_song, n_playlist_info)
+            if matched_navidrome_song:
+                # Skip exact matches - song already in playlist with correct ISRC
                 playlist_status["to_keep"].append(spotify_song['id'])
+                navidrome_songs_to_keep.add(matched_navidrome_song['id'])
                 self.logger.debug(f"Song already in Navidrome by ISRC: {spotify_song['search_string']}")
                 continue
             try:
@@ -99,12 +104,40 @@ class PlaylistDownloader:
                 elif not self.song_in_playlist(selected_song, n_playlist_info, playlist_status):
                     # Song not in the playlist
                     playlist_status["to_add"].append(selected_song['id'])
+                    navidrome_songs_to_keep.add(selected_song['id'])
                 else:
                     playlist_status["to_keep"].append(selected_song['id'])
+                    navidrome_songs_to_keep.add(selected_song['id'])
                     self.logger.debug(f"Song already in Navidrome: {spotify_song['search_string']}")
             except Exception as e:
                 print(f"Errore nel parsing del brano '{spotify_song}': {e}")
                 self.logger.error(f"Errore nel parsing del brano '{spotify_song}': {e}", exc_info=True)
+        
+        # Identify songs in Navidrome playlist that are not in Spotify and mark for removal
+        self.mark_songs_for_removal(n_playlist_info, navidrome_songs_to_keep, playlist_status)
+
+    def mark_songs_for_removal(self, n_playlist_info, navidrome_songs_to_keep, playlist_status):
+        """
+        Identifies songs in the Navidrome playlist that are not present in the Spotify playlist
+        and marks them for removal.
+        
+        Args:
+            n_playlist_info (dict): Information about the Navidrome playlist including its entries.
+            navidrome_songs_to_keep (set): Set of Navidrome song IDs that should be kept.
+            playlist_status (dict): Dictionary containing playlist status including songs to remove.
+        """
+        # Get indices already marked for removal (e.g., duplicates)
+        already_marked = set(playlist_status["to_remove"])
+        
+        for index, navidrome_song in enumerate(n_playlist_info.get('entry', [])):
+            # Skip if already marked for removal
+            if index in already_marked:
+                continue
+            
+            if navidrome_song['id'] not in navidrome_songs_to_keep:
+                # This song is in Navidrome but not in Spotify - mark for removal
+                playlist_status["to_remove"].append(index)
+                self.logger.info(f"Rimozione brano non presente in Spotify: {navidrome_song.get('title', 'Unknown')} di {navidrome_song.get('artist', 'Unknown')}")
 
     def get_navidrome_playlist_info(self, selected_playlist):
         # Estrae le informazioni della playlist da Navidrome
@@ -254,6 +287,20 @@ def clean_directory_name(dir_name: str) -> str:
     clean_name = re.sub(r'\s+', ' ', clean_name).strip()
     return clean_name
 
+def find_song_by_isrc(spotify_song: dict, navidrome_playlist: dict) -> dict:
+    """
+    Trova una canzone nella playlist di Navidrome basandosi sull'ISRC.
+    Args:
+        spotify_song (dict): Dizionario contenente le informazioni della canzone Spotify.
+        navidrome_playlist (dict): Dizionario contenente le informazioni della playlist Navidrome.
+    Returns:
+        dict: La canzone di Navidrome che corrisponde, o un dizionario vuoto se non trovata.
+    """
+    for navidrome_song in navidrome_playlist.get('entry', []):
+        if isrc_match(spotify_song, navidrome_song):
+            return navidrome_song
+    return {}
+
 def isrc_already_present(spotify_song: dict, navidrome_playlist: dict) -> bool:
     """
     Verifica se una canzone di Spotify è già presente in una playlist di Navidrome basandosi sull'ISRC.
@@ -263,10 +310,7 @@ def isrc_already_present(spotify_song: dict, navidrome_playlist: dict) -> bool:
     Returns:
         bool: True se la canzone è già presente, False altrimenti.
     """
-    for navidrome_song in navidrome_playlist.get('entry', []):
-        if isrc_match(spotify_song, navidrome_song):
-            return True
-    return False
+    return bool(find_song_by_isrc(spotify_song, navidrome_playlist))
 
 def isrc_match(spotify_song_info: dict, nv_song_info: list) -> bool:
     """
