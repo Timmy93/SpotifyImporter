@@ -5,6 +5,11 @@
       "matchManagers": ["pip_requirements"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python", "python/*"],
+      "enabled": false
     }
   ]
 }
