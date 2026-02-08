@@ -17,6 +17,7 @@ class Navidrome:
         self.salt, self.token = create_navidrome_token(
             config['navidrome']["password"]
         )
+        self.session = requests.Session()
 
     def search_this_song(self, song_info: dict) -> list:
         """Cerca una canzone in Navidrome/OpenSubsonic utilizzando il titolo e l'artista.
@@ -173,8 +174,8 @@ class Navidrome:
             "c": "spotify_sync",
             "f": "json"
         })
-        response = requests.get(url, params=params, timeout=10)
         try:
+            response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             return response.json()
         except requests.HTTPError as e:
