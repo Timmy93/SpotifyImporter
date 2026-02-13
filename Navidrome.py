@@ -41,10 +41,10 @@ class Navidrome:
             self.logger.error(f"Errore nella richiesta a Navidrome: {e}")
             return []
 
-    def list_playlists(self) -> list:
+    def list_playlists(self) -> list|None:
         """Recupera la lista delle playlist dell'utente da Navidrome.
         Returns:
-            list: Lista di dizionari contenenti le informazioni delle playlist.
+            list|None: Lista di dizionari contenenti le informazioni delle playlist o None in caso di errore.
         """
         endpoint = "rest/getPlaylists.view"
         try:
@@ -53,7 +53,7 @@ class Navidrome:
         except (requests.HTTPError, Exception) as e:
             print(f"Errore nella richiesta a Navidrome: {e}")
             self.logger.error(f"Errore nella richiesta a Navidrome: {e}")
-            return []
+            return None
 
     def create_playlist(self, playlist_name: str, playlist_id: str = "", songs: list = None) -> dict:
         """Crea una nuova playlist in Navidrome.

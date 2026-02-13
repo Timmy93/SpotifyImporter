@@ -201,6 +201,10 @@ class PlaylistDownloader:
             dict: Le informazioni della playlist Navidrome creata o trovata.
         """
         navidrome_playlists = self.navidrome_client.list_playlists()
+        if navidrome_playlists is None:
+            print("❌ Impossibile recuperare le playlist da Navidrome.")
+            self.logger.error("Impossibile recuperare le playlist da Navidrome.")
+            return {}
         selected_navidrome_playlist = None
         if not spotify_playlist.get('name'):
             print("❌ Playlist Spotify senza nome. Impossibile procedere.")
