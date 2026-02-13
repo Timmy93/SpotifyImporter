@@ -116,7 +116,7 @@ class Spotify:
             else:
                 break
 
-        self.logger.info(f"Estratte {len(tracks)} tracce dalla playlist {playlist_info['name']} [{playlist_info['id']}].")
+        self.logger.debug(f"Estratte {len(tracks)} tracce dalla playlist {playlist_info['name']} [{playlist_info['id']}].")
         return tracks
 
     def download_songs(self, m_tracks: list, destination_path: str, subdirectory: str = "") -> list:

@@ -35,7 +35,6 @@ class PlaylistDownloader:
                 self.logger.debug(f"Skipping excluded playlist: {playlist['name']}")
                 continue
             if playlist['name'] in selected_playlists:
-                self.logger.info(f"Syncing playlist: {playlist['name']}")
                 try:
                     self.sync_this_playlist(playlist)
                 except Exception as e:
@@ -190,7 +189,7 @@ class PlaylistDownloader:
         if downloads:
             print(f"📂 Scaricati {len(downloads)} brani su {len(playlist_info["to_download"])} richiesti.")
         else:
-            print("❌ Nessun brano scaricato. Tutti i brani erano già presenti in Navidrome.")
+            self.logger.debug("❌ Nessun brano scaricato. Tutti i brani erano già presenti in Navidrome.")
 
     def select_navidrome_playlist(self, spotify_playlist: dict) -> dict:
         """
@@ -241,7 +240,7 @@ class PlaylistDownloader:
         elif len(n_songs_found) == 1:
             # Only one song found - return it
             if not isrc_match(sp_song, n_songs_found[0]):
-                self.logger.info(f"No exact ISRC match found for {sp_song['search_string']}, returning first result.")
+                self.logger.debug(f"One possible song found - No exact ISRC match [{sp_song['search_string']}]")
             return n_songs_found[0]
         else:
             # Multiple songs found - try to get the best match
